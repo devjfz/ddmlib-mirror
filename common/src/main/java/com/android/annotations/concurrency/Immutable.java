@@ -22,12 +22,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Indicates that the target class to which this annotation is applied
- * is immutable.
- */
+/** Indicates that the target class to which this annotation is applied is immutable. */
 @Documented
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
-public @interface Immutable {
-}
+public @interface Immutable {}

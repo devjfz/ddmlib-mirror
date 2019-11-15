@@ -19,5 +19,5 @@ package com.android.ddmlib.logcat;
 import java.util.List;
 
 public interface LogCatListener {
-    void log(List<LogCatMessage> msgList);
+  void log(List<LogCatMessage> msgList);
 }

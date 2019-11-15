@@ -21,35 +21,34 @@ import com.android.annotations.Nullable;
 
 /**
  * Dummy implementation of an {@link ILogger}.
- * <p/>
- * Use {@link #getLogger()} to get a default instance of this {@link NullLogger}.
+ *
+ * <p>Use {@link #getLogger()} to get a default instance of this {@link NullLogger}.
  */
 public class NullLogger implements ILogger {
 
-    private static final ILogger sThis = new NullLogger();
+  private static final ILogger sThis = new NullLogger();
 
-    public static ILogger getLogger() {
-        return sThis;
-    }
+  public static ILogger getLogger() {
+    return sThis;
+  }
 
-    @Override
-    public void error(@Nullable Throwable t, @Nullable String errorFormat, Object... args) {
-        // ignore
-    }
+  @Override
+  public void error(@Nullable Throwable t, @Nullable String errorFormat, Object... args) {
+    // ignore
+  }
 
-    @Override
-    public void warning(@NonNull String warningFormat, Object... args) {
-        // ignore
-    }
+  @Override
+  public void warning(@NonNull String warningFormat, Object... args) {
+    // ignore
+  }
 
-    @Override
-    public void info(@NonNull String msgFormat, Object... args) {
-        // ignore
-    }
+  @Override
+  public void info(@NonNull String msgFormat, Object... args) {
+    // ignore
+  }
 
-    @Override
-    public void verbose(@NonNull String msgFormat, Object... args) {
-        // ignore
-    }
-
+  @Override
+  public void verbose(@NonNull String msgFormat, Object... args) {
+    // ignore
+  }
 }

@@ -16,35 +16,34 @@
 
 package com.android.io;
 
-
-/**
- * Exception thrown when {@link IAbstractFile#getContents()} fails.
- */
+/** Exception thrown when {@link IAbstractFile#getContents()} fails. */
 public class StreamException extends Exception {
-    private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = 1L;
 
-    public static enum Error {
-        DEFAULT, OUTOFSYNC, FILENOTFOUND
-    }
+  public static enum Error {
+    DEFAULT,
+    OUTOFSYNC,
+    FILENOTFOUND
+  }
 
-    private final  Error mError;
-    private final IAbstractFile mFile;
+  private final Error mError;
+  private final IAbstractFile mFile;
 
-    public StreamException(Exception e, IAbstractFile file) {
-        this(e, file, Error.DEFAULT);
-    }
+  public StreamException(Exception e, IAbstractFile file) {
+    this(e, file, Error.DEFAULT);
+  }
 
-    public StreamException(Exception e, IAbstractFile file, Error error) {
-        super(e);
-        mFile = file;
-        mError = error;
-    }
+  public StreamException(Exception e, IAbstractFile file, Error error) {
+    super(e);
+    mFile = file;
+    mError = error;
+  }
 
-    public Error getError() {
-        return mError;
-    }
+  public Error getError() {
+    return mError;
+  }
 
-    public IAbstractFile getFile() {
-        return mFile;
-    }
+  public IAbstractFile getFile() {
+    return mFile;
+  }
 }

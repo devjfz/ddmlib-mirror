@@ -23,281 +23,266 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-/**
- * Handle thread status updates.
- */
+/** Handle thread status updates. */
 final class HandleNativeHeap extends ChunkHandler {
 
-    public static final int CHUNK_NHGT = type("NHGT"); //$NON-NLS-1$
-    public static final int CHUNK_NHSG = type("NHSG"); //$NON-NLS-1$
-    public static final int CHUNK_NHST = type("NHST"); //$NON-NLS-1$
-    public static final int CHUNK_NHEN = type("NHEN"); //$NON-NLS-1$
+  public static final int CHUNK_NHGT = type("NHGT"); // $NON-NLS-1$
+  public static final int CHUNK_NHSG = type("NHSG"); // $NON-NLS-1$
+  public static final int CHUNK_NHST = type("NHST"); // $NON-NLS-1$
+  public static final int CHUNK_NHEN = type("NHEN"); // $NON-NLS-1$
 
-    private static final HandleNativeHeap mInst = new HandleNativeHeap();
+  private static final HandleNativeHeap mInst = new HandleNativeHeap();
 
-    private HandleNativeHeap() {
+  private HandleNativeHeap() {}
+
+  /** Register for the packets we expect to get from the client. */
+  public static void register(MonitorThread mt) {
+    mt.registerChunkHandler(CHUNK_NHGT, mInst);
+    mt.registerChunkHandler(CHUNK_NHSG, mInst);
+    mt.registerChunkHandler(CHUNK_NHST, mInst);
+    mt.registerChunkHandler(CHUNK_NHEN, mInst);
+  }
+
+  /** Client is ready. */
+  @Override
+  public void clientReady(Client client) throws IOException {}
+
+  /** Client went away. */
+  @Override
+  public void clientDisconnected(Client client) {}
+
+  /** Chunk handler entry point. */
+  @Override
+  public void handleChunk(Client client, int type, ByteBuffer data, boolean isReply, int msgId) {
+
+    Log.d("ddm-nativeheap", "handling " + ChunkHandler.name(type));
+
+    if (type == CHUNK_NHGT) {
+      handleNHGT(client, data);
+    } else if (type == CHUNK_NHST) {
+      // start chunk before any NHSG chunk(s)
+      client.getClientData().getNativeHeapData().clearHeapData();
+    } else if (type == CHUNK_NHEN) {
+      // end chunk after NHSG chunk(s)
+      client.getClientData().getNativeHeapData().sealHeapData();
+    } else if (type == CHUNK_NHSG) {
+      handleNHSG(client, data);
+    } else {
+      handleUnknownChunk(client, type, data, isReply, msgId);
     }
 
+    client.update(Client.CHANGE_NATIVE_HEAP_DATA);
+  }
 
-    /**
-     * Register for the packets we expect to get from the client.
-     */
-    public static void register(MonitorThread mt) {
-        mt.registerChunkHandler(CHUNK_NHGT, mInst);
-        mt.registerChunkHandler(CHUNK_NHSG, mInst);
-        mt.registerChunkHandler(CHUNK_NHST, mInst);
-        mt.registerChunkHandler(CHUNK_NHEN, mInst);
+  /** Send an NHGT (Native Thread GeT) request to the client. */
+  public static void sendNHGT(Client client) throws IOException {
+
+    ByteBuffer rawBuf = allocBuffer(0);
+    JdwpPacket packet = new JdwpPacket(rawBuf);
+    ByteBuffer buf = getChunkDataBuf(rawBuf);
+
+    // no data in request message
+
+    finishChunkPacket(packet, CHUNK_NHGT, buf.position());
+    Log.d("ddm-nativeheap", "Sending " + name(CHUNK_NHGT));
+    client.sendAndConsume(packet, mInst);
+
+    rawBuf = allocBuffer(2);
+    packet = new JdwpPacket(rawBuf);
+    buf = getChunkDataBuf(rawBuf);
+
+    buf.put((byte) HandleHeap.WHEN_DISABLE);
+    buf.put((byte) HandleHeap.WHAT_OBJ);
+
+    finishChunkPacket(packet, CHUNK_NHSG, buf.position());
+    Log.d("ddm-nativeheap", "Sending " + name(CHUNK_NHSG));
+    client.sendAndConsume(packet, mInst);
+  }
+
+  /*
+   * Handle our native heap data.
+   */
+  private void handleNHGT(Client client, ByteBuffer data) {
+    ClientData cd = client.getClientData();
+
+    Log.d("ddm-nativeheap", "NHGT: " + data.limit() + " bytes");
+
+    // TODO - process incoming data and save in "cd"
+    byte[] copy = new byte[data.limit()];
+    data.get(copy);
+
+    // clear the previous run
+    cd.clearNativeAllocationInfo();
+
+    ByteBuffer buffer = ByteBuffer.wrap(copy);
+    buffer.order(ByteOrder.LITTLE_ENDIAN);
+
+    //        read the header
+    //        typedef struct Header {
+    //            uint32_t mapSize;
+    //            uint32_t allocSize;
+    //            uint32_t allocInfoSize;
+    //            uint32_t totalMemory;
+    //              uint32_t backtraceSize;
+    //        };
+
+    int mapSize = buffer.getInt();
+    int allocSize = buffer.getInt();
+    int allocInfoSize = buffer.getInt();
+    int totalMemory = buffer.getInt();
+    int backtraceSize = buffer.getInt();
+
+    Log.d("ddms", "mapSize: " + mapSize);
+    Log.d("ddms", "allocSize: " + allocSize);
+    Log.d("ddms", "allocInfoSize: " + allocInfoSize);
+    Log.d("ddms", "totalMemory: " + totalMemory);
+
+    cd.setTotalNativeMemory(totalMemory);
+
+    // this means that updates aren't turned on.
+    if (allocInfoSize == 0) return;
+
+    if (mapSize > 0) {
+      byte[] maps = new byte[mapSize];
+      buffer.get(maps, 0, mapSize);
+      parseMaps(cd, maps);
     }
 
-    /**
-     * Client is ready.
-     */
-    @Override
-    public void clientReady(Client client) throws IOException {}
+    int iterations = allocSize / allocInfoSize;
 
-    /**
-     * Client went away.
-     */
-    @Override
-    public void clientDisconnected(Client client) {}
+    for (int i = 0; i < iterations; i++) {
+      NativeAllocationInfo info =
+          new NativeAllocationInfo(buffer.getInt() /* size */, buffer.getInt() /* allocations */);
 
-    /**
-     * Chunk handler entry point.
-     */
-    @Override
-    public void handleChunk(Client client, int type, ByteBuffer data, boolean isReply, int msgId) {
+      for (int j = 0; j < backtraceSize; j++) {
+        long addr = (buffer.getInt()) & 0x00000000ffffffffL;
 
-        Log.d("ddm-nativeheap", "handling " + ChunkHandler.name(type));
-
-        if (type == CHUNK_NHGT) {
-            handleNHGT(client, data);
-        } else if (type == CHUNK_NHST) {
-            // start chunk before any NHSG chunk(s)
-            client.getClientData().getNativeHeapData().clearHeapData();
-        } else if (type == CHUNK_NHEN) {
-            // end chunk after NHSG chunk(s)
-            client.getClientData().getNativeHeapData().sealHeapData();
-        } else if (type == CHUNK_NHSG) {
-            handleNHSG(client, data);
-        } else {
-            handleUnknownChunk(client, type, data, isReply, msgId);
+        if (addr == 0x0) {
+          // skip past null addresses
+          continue;
         }
 
-        client.update(Client.CHANGE_NATIVE_HEAP_DATA);
+        info.addStackCallAddress(addr);
+      }
+
+      cd.addNativeAllocation(info);
+    }
+  }
+
+  private void handleNHSG(Client client, ByteBuffer data) {
+    byte dataCopy[] = new byte[data.limit()];
+    data.rewind();
+    data.get(dataCopy);
+    data = ByteBuffer.wrap(dataCopy);
+    client.getClientData().getNativeHeapData().addHeapData(data);
+
+    if (true) {
+      return;
     }
 
-    /**
-     * Send an NHGT (Native Thread GeT) request to the client.
-     */
-    public static void sendNHGT(Client client) throws IOException {
+    // WORK IN PROGRESS
 
-        ByteBuffer rawBuf = allocBuffer(0);
-        JdwpPacket packet = new JdwpPacket(rawBuf);
-        ByteBuffer buf = getChunkDataBuf(rawBuf);
+    //        Log.e("ddm-nativeheap", "NHSG: ----------------------------------");
+    //        Log.e("ddm-nativeheap", "NHSG: " + data.limit() + " bytes");
 
-        // no data in request message
+    byte[] copy = new byte[data.limit()];
+    data.get(copy);
 
-        finishChunkPacket(packet, CHUNK_NHGT, buf.position());
-        Log.d("ddm-nativeheap", "Sending " + name(CHUNK_NHGT));
-        client.sendAndConsume(packet, mInst);
+    ByteBuffer buffer = ByteBuffer.wrap(copy);
+    buffer.order(ByteOrder.BIG_ENDIAN);
 
-        rawBuf = allocBuffer(2);
-        packet = new JdwpPacket(rawBuf);
-        buf = getChunkDataBuf(rawBuf);
+    int id = buffer.getInt();
+    int unitsize = buffer.get();
+    long startAddress = buffer.getInt() & 0x00000000ffffffffL;
+    int offset = buffer.getInt();
+    int allocationUnitCount = buffer.getInt();
 
-        buf.put((byte)HandleHeap.WHEN_DISABLE);
-        buf.put((byte)HandleHeap.WHAT_OBJ);
+    //        Log.e("ddm-nativeheap", "id: " + id);
+    //        Log.e("ddm-nativeheap", "unitsize: " + unitsize);
+    //        Log.e("ddm-nativeheap", "startAddress: 0x" + Long.toHexString(startAddress));
+    //        Log.e("ddm-nativeheap", "offset: " + offset);
+    //        Log.e("ddm-nativeheap", "allocationUnitCount: " + allocationUnitCount);
+    //        Log.e("ddm-nativeheap", "end: 0x" +
+    //                Long.toHexString(startAddress + unitsize * allocationUnitCount));
 
-        finishChunkPacket(packet, CHUNK_NHSG, buf.position());
-        Log.d("ddm-nativeheap", "Sending " + name(CHUNK_NHSG));
-        client.sendAndConsume(packet, mInst);
+    // read the usage
+    while (buffer.position() < buffer.limit()) {
+      int eState = buffer.get() & 0x000000ff;
+      int eLen = (buffer.get() & 0x000000ff) + 1;
+      // Log.e("ddm-nativeheap", "solidity: " + (eState & 0x7) + " - kind: "
+      //        + ((eState >> 3) & 0x7) + " - len: " + eLen);
     }
 
-    /*
-     * Handle our native heap data.
-     */
-    private void handleNHGT(Client client, ByteBuffer data) {
-        ClientData cd = client.getClientData();
+    //        count += unitsize * allocationUnitCount;
+    //        Log.e("ddm-nativeheap", "count = " + count);
 
-        Log.d("ddm-nativeheap", "NHGT: " + data.limit() + " bytes");
+  }
 
-        // TODO - process incoming data and save in "cd"
-        byte[] copy = new byte[data.limit()];
-        data.get(copy);
+  private void parseMaps(ClientData cd, byte[] maps) {
+    InputStreamReader input = new InputStreamReader(new ByteArrayInputStream(maps));
+    BufferedReader reader = new BufferedReader(input);
 
-        // clear the previous run
-        cd.clearNativeAllocationInfo();
+    String line;
 
-        ByteBuffer buffer = ByteBuffer.wrap(copy);
-        buffer.order(ByteOrder.LITTLE_ENDIAN);
+    try {
 
-//        read the header
-//        typedef struct Header {
-//            uint32_t mapSize;
-//            uint32_t allocSize;
-//            uint32_t allocInfoSize;
-//            uint32_t totalMemory;
-//              uint32_t backtraceSize;
-//        };
+      // most libraries are defined on several lines, so we need to make sure we parse
+      // all the library lines and only add the library at the end
+      long startAddr = 0;
+      long endAddr = 0;
+      String library = null;
 
-        int mapSize = buffer.getInt();
-        int allocSize = buffer.getInt();
-        int allocInfoSize = buffer.getInt();
-        int totalMemory = buffer.getInt();
-        int backtraceSize = buffer.getInt();
-
-        Log.d("ddms", "mapSize: " + mapSize);
-        Log.d("ddms", "allocSize: " + allocSize);
-        Log.d("ddms", "allocInfoSize: " + allocInfoSize);
-        Log.d("ddms", "totalMemory: " + totalMemory);
-
-        cd.setTotalNativeMemory(totalMemory);
-
-        // this means that updates aren't turned on.
-        if (allocInfoSize == 0)
-          return;
-
-        if (mapSize > 0) {
-            byte[] maps = new byte[mapSize];
-            buffer.get(maps, 0, mapSize);
-            parseMaps(cd, maps);
+      while ((line = reader.readLine()) != null) {
+        Log.d("ddms", "line: " + line);
+        if (line.length() < 16) {
+          continue;
         }
-
-        int iterations = allocSize / allocInfoSize;
-
-        for (int i = 0 ; i < iterations ; i++) {
-            NativeAllocationInfo info = new NativeAllocationInfo(
-                    buffer.getInt() /* size */,
-                    buffer.getInt() /* allocations */);
-
-            for (int j = 0 ; j < backtraceSize ; j++) {
-                long addr = (buffer.getInt()) & 0x00000000ffffffffL;
-
-                if (addr == 0x0) {
-                    // skip past null addresses
-                    continue;
-                }
-
-                info.addStackCallAddress(addr);
-            }
-
-            cd.addNativeAllocation(info);
-        }
-    }
-
-    private void handleNHSG(Client client, ByteBuffer data) {
-        byte dataCopy[] = new byte[data.limit()];
-        data.rewind();
-        data.get(dataCopy);
-        data = ByteBuffer.wrap(dataCopy);
-        client.getClientData().getNativeHeapData().addHeapData(data);
-
-        if (true) {
-            return;
-        }
-
-        // WORK IN PROGRESS
-
-//        Log.e("ddm-nativeheap", "NHSG: ----------------------------------");
-//        Log.e("ddm-nativeheap", "NHSG: " + data.limit() + " bytes");
-
-        byte[] copy = new byte[data.limit()];
-        data.get(copy);
-
-        ByteBuffer buffer = ByteBuffer.wrap(copy);
-        buffer.order(ByteOrder.BIG_ENDIAN);
-
-        int id = buffer.getInt();
-        int unitsize = buffer.get();
-        long startAddress = buffer.getInt() & 0x00000000ffffffffL;
-        int offset = buffer.getInt();
-        int allocationUnitCount = buffer.getInt();
-
-//        Log.e("ddm-nativeheap", "id: " + id);
-//        Log.e("ddm-nativeheap", "unitsize: " + unitsize);
-//        Log.e("ddm-nativeheap", "startAddress: 0x" + Long.toHexString(startAddress));
-//        Log.e("ddm-nativeheap", "offset: " + offset);
-//        Log.e("ddm-nativeheap", "allocationUnitCount: " + allocationUnitCount);
-//        Log.e("ddm-nativeheap", "end: 0x" +
-//                Long.toHexString(startAddress + unitsize * allocationUnitCount));
-
-        // read the usage
-        while (buffer.position() < buffer.limit()) {
-            int eState = buffer.get() & 0x000000ff;
-            int eLen = (buffer.get() & 0x000000ff) + 1;
-            //Log.e("ddm-nativeheap", "solidity: " + (eState & 0x7) + " - kind: "
-            //        + ((eState >> 3) & 0x7) + " - len: " + eLen);
-        }
-
-
-//        count += unitsize * allocationUnitCount;
-//        Log.e("ddm-nativeheap", "count = " + count);
-
-    }
-
-    private void parseMaps(ClientData cd, byte[] maps) {
-        InputStreamReader input = new InputStreamReader(new ByteArrayInputStream(maps));
-        BufferedReader reader = new BufferedReader(input);
-
-        String line;
 
         try {
+          long tmpStart = Long.parseLong(line.substring(0, 8), 16);
+          long tmpEnd = Long.parseLong(line.substring(9, 17), 16);
 
-            // most libraries are defined on several lines, so we need to make sure we parse
-            // all the library lines and only add the library at the end
-            long startAddr = 0;
-            long endAddr = 0;
-            String library = null;
+          int index = line.indexOf('/');
 
-            while ((line = reader.readLine()) != null) {
-                Log.d("ddms", "line: " + line);
-                if (line.length() < 16) {
-                    continue;
-                }
+          if (index == -1) continue;
 
-                try {
-                    long tmpStart = Long.parseLong(line.substring(0, 8), 16);
-                    long tmpEnd = Long.parseLong(line.substring(9, 17), 16);
+          String tmpLib = line.substring(index);
 
-                    int index = line.indexOf('/');
-
-                    if (index == -1)
-                        continue;
-
-                    String tmpLib = line.substring(index);
-
-                    if (library == null ||
-                            (library != null && !tmpLib.equals(library))) {
-
-                        if (library != null) {
-                            cd.addNativeLibraryMapInfo(startAddr, endAddr, library);
-                            Log.d("ddms", library + "(" + Long.toHexString(startAddr) +
-                                    " - " + Long.toHexString(endAddr) + ")");
-                        }
-
-                        // now init the new library
-                        library = tmpLib;
-                        startAddr = tmpStart;
-                        endAddr = tmpEnd;
-                    } else {
-                        // add the new end
-                        endAddr = tmpEnd;
-                    }
-                } catch (NumberFormatException e) {
-                    e.printStackTrace();
-                }
-            }
+          if (library == null || (library != null && !tmpLib.equals(library))) {
 
             if (library != null) {
-                cd.addNativeLibraryMapInfo(startAddr, endAddr, library);
-                Log.d("ddms", library + "(" + Long.toHexString(startAddr) +
-                        " - " + Long.toHexString(endAddr) + ")");
+              cd.addNativeLibraryMapInfo(startAddr, endAddr, library);
+              Log.d(
+                  "ddms",
+                  library
+                      + "("
+                      + Long.toHexString(startAddr)
+                      + " - "
+                      + Long.toHexString(endAddr)
+                      + ")");
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+
+            // now init the new library
+            library = tmpLib;
+            startAddr = tmpStart;
+            endAddr = tmpEnd;
+          } else {
+            // add the new end
+            endAddr = tmpEnd;
+          }
+        } catch (NumberFormatException e) {
+          e.printStackTrace();
         }
+      }
+
+      if (library != null) {
+        cd.addNativeLibraryMapInfo(startAddr, endAddr, library);
+        Log.d(
+            "ddms",
+            library + "(" + Long.toHexString(startAddr) + " - " + Long.toHexString(endAddr) + ")");
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
     }
-
-
+  }
 }
-

@@ -17,26 +17,25 @@
 package com.android.utils;
 
 import com.android.annotations.NonNull;
-
 import java.io.IOException;
 
 /**
  * Interface to read a line from the {@link System#in} input stream.
- * <p/>
- * The interface also implements {@link ILogger} since code that needs to ask for
- * a command-line input will most likely also want to use {@link ILogger#info(String, Object...)}
- * to print information such as an input prompt.
+ *
+ * <p>The interface also implements {@link ILogger} since code that needs to ask for a command-line
+ * input will most likely also want to use {@link ILogger#info(String, Object...)} to print
+ * information such as an input prompt.
  */
 public interface IReaderLogger extends ILogger {
 
-    /**
-     * Reads a line from {@link System#in}.
-     * <p/>
-     * This call is blocking and should only be called from command-line enabled applications.
-     *
-     * @param inputBuffer A non-null buffer where to place the input.
-     * @return The number of bytes read into the buffer.
-     * @throws IOException as returned by {code System.in.read()}.
-     */
-    int readLine(@NonNull byte[] inputBuffer) throws IOException;
+  /**
+   * Reads a line from {@link System#in}.
+   *
+   * <p>This call is blocking and should only be called from command-line enabled applications.
+   *
+   * @param inputBuffer A non-null buffer where to place the input.
+   * @return The number of bytes read into the buffer.
+   * @throws IOException as returned by {code System.in.read()}.
+   */
+  int readLine(@NonNull byte[] inputBuffer) throws IOException;
 }

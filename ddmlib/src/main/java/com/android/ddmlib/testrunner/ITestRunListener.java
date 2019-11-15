@@ -20,90 +20,89 @@ import java.util.Map;
 
 /**
  * Receives event notifications during instrumentation test runs.
- * <p/>
- * Patterned after junit.runner.TestRunListener.
- * <p/>
- * The sequence of calls will be:
+ *
+ * <p>Patterned after junit.runner.TestRunListener.
+ *
+ * <p>The sequence of calls will be:
+ *
  * <ul>
- * <li> testRunStarted
- * <li> testStarted
- * <li> [testFailed]
- * <li> testEnded
- * <li> ....
- * <li> [testRunFailed]
- * <li> testRunEnded
+ *   <li>testRunStarted
+ *   <li>testStarted
+ *   <li>[testFailed]
+ *   <li>testEnded
+ *   <li>....
+ *   <li>[testRunFailed]
+ *   <li>testRunEnded
  * </ul>
  */
 public interface ITestRunListener {
 
-    /**
-     *  Types of test failures.
-     */
-    enum TestFailure {
-        /** Test failed due to unanticipated uncaught exception. */
-        ERROR,
-        /** Test failed due to a false assertion. */
-        FAILURE
-    }
+  /** Types of test failures. */
+  enum TestFailure {
+    /** Test failed due to unanticipated uncaught exception. */
+    ERROR,
+    /** Test failed due to a false assertion. */
+    FAILURE
+  }
 
-    /**
-     * Reports the start of a test run.
-     *
-     * @param runName the test run name
-     * @param testCount total number of tests in test run
-     */
-    public void testRunStarted(String runName, int testCount);
+  /**
+   * Reports the start of a test run.
+   *
+   * @param runName the test run name
+   * @param testCount total number of tests in test run
+   */
+  public void testRunStarted(String runName, int testCount);
 
-    /**
-     * Reports the start of an individual test case.
-     *
-     * @param test identifies the test
-     */
-    public void testStarted(TestIdentifier test);
+  /**
+   * Reports the start of an individual test case.
+   *
+   * @param test identifies the test
+   */
+  public void testStarted(TestIdentifier test);
 
-    /**
-     * Reports the failure of a individual test case.
-     * <p/>
-     * Will be called between testStarted and testEnded.
-     *
-     * @param status failure type
-     * @param test identifies the test
-     * @param trace stack trace of failure
-     */
-    public void testFailed(TestFailure status, TestIdentifier test, String trace);
+  /**
+   * Reports the failure of a individual test case.
+   *
+   * <p>Will be called between testStarted and testEnded.
+   *
+   * @param status failure type
+   * @param test identifies the test
+   * @param trace stack trace of failure
+   */
+  public void testFailed(TestFailure status, TestIdentifier test, String trace);
 
-    /**
-     * Reports the execution end of an individual test case.
-     * <p/>
-     * If {@link #testFailed} was not invoked, this test passed.  Also returns any key/value
-     * metrics which may have been emitted during the test case's execution.
-     *
-     * @param test identifies the test
-     * @param testMetrics a {@link Map} of the metrics emitted
-     */
-    public void testEnded(TestIdentifier test, Map<String, String> testMetrics);
+  /**
+   * Reports the execution end of an individual test case.
+   *
+   * <p>If {@link #testFailed} was not invoked, this test passed. Also returns any key/value metrics
+   * which may have been emitted during the test case's execution.
+   *
+   * @param test identifies the test
+   * @param testMetrics a {@link Map} of the metrics emitted
+   */
+  public void testEnded(TestIdentifier test, Map<String, String> testMetrics);
 
-    /**
-     * Reports test run failed to complete due to a fatal error.
-     *
-     * @param errorMessage {@link String} describing reason for run failure.
-     */
-    public void testRunFailed(String errorMessage);
+  /**
+   * Reports test run failed to complete due to a fatal error.
+   *
+   * @param errorMessage {@link String} describing reason for run failure.
+   */
+  public void testRunFailed(String errorMessage);
 
-    /**
-     * Reports test run stopped before completion due to a user request.
-     * <p/>
-     * TODO: currently unused, consider removing
-     *
-     * @param elapsedTime device reported elapsed time, in milliseconds
-     */
-    public void testRunStopped(long elapsedTime);
+  /**
+   * Reports test run stopped before completion due to a user request.
+   *
+   * <p>TODO: currently unused, consider removing
+   *
+   * @param elapsedTime device reported elapsed time, in milliseconds
+   */
+  public void testRunStopped(long elapsedTime);
 
-    /**
-     * Reports end of test run.
-     *
-     * @param elapsedTime device reported elapsed time, in milliseconds
-     * @param runMetrics key-value pairs reported at the end of a test run
-     */
-    public void testRunEnded(long elapsedTime, Map<String, String> runMetrics);
+  /**
+   * Reports end of test run.
+   *
+   * @param elapsedTime device reported elapsed time, in milliseconds
+   * @param runMetrics key-value pairs reported at the end of a test run
+   */
+  public void testRunEnded(long elapsedTime, Map<String, String> runMetrics);
 }

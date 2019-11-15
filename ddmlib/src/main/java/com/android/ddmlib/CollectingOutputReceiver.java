@@ -15,60 +15,53 @@
  */
 package com.android.ddmlib;
 
-
 import java.io.UnsupportedEncodingException;
 import java.util.concurrent.CountDownLatch;
 
-/**
- * A {@link IShellOutputReceiver} which collects the whole shell output into one
- * {@link String}.
- */
+/** A {@link IShellOutputReceiver} which collects the whole shell output into one {@link String}. */
 public class CollectingOutputReceiver implements IShellOutputReceiver {
-    private CountDownLatch mCompletionLatch;
-    private StringBuffer mOutputBuffer = new StringBuffer();
-    private boolean mIsCanceled = false;
+  private CountDownLatch mCompletionLatch;
+  private StringBuffer mOutputBuffer = new StringBuffer();
+  private boolean mIsCanceled = false;
 
-    public CollectingOutputReceiver() {
-    }
+  public CollectingOutputReceiver() {}
 
-    public CollectingOutputReceiver(CountDownLatch commandCompleteLatch) {
-        mCompletionLatch = commandCompleteLatch;
-    }
+  public CollectingOutputReceiver(CountDownLatch commandCompleteLatch) {
+    mCompletionLatch = commandCompleteLatch;
+  }
 
-    public String getOutput() {
-        return mOutputBuffer.toString();
-    }
+  public String getOutput() {
+    return mOutputBuffer.toString();
+  }
 
-    @Override
-    public boolean isCancelled() {
-        return mIsCanceled;
-    }
+  @Override
+  public boolean isCancelled() {
+    return mIsCanceled;
+  }
 
-    /**
-     * Cancel the output collection
-     */
-    public void cancel() {
-        mIsCanceled = true;
-    }
+  /** Cancel the output collection */
+  public void cancel() {
+    mIsCanceled = true;
+  }
 
-    @Override
-    public void addOutput(byte[] data, int offset, int length) {
-        if (!isCancelled()) {
-            String s = null;
-            try {
-                s = new String(data, offset, length, "UTF-8"); //$NON-NLS-1$
-            } catch (UnsupportedEncodingException e) {
-                // normal encoding didn't work, try the default one
-                s = new String(data, offset,length);
-            }
-            mOutputBuffer.append(s);
-        }
+  @Override
+  public void addOutput(byte[] data, int offset, int length) {
+    if (!isCancelled()) {
+      String s = null;
+      try {
+        s = new String(data, offset, length, "UTF-8"); // $NON-NLS-1$
+      } catch (UnsupportedEncodingException e) {
+        // normal encoding didn't work, try the default one
+        s = new String(data, offset, length);
+      }
+      mOutputBuffer.append(s);
     }
+  }
 
-    @Override
-    public void flush() {
-        if (mCompletionLatch != null) {
-            mCompletionLatch.countDown();
-        }
+  @Override
+  public void flush() {
+    if (mCompletionLatch != null) {
+      mCompletionLatch.countDown();
     }
+  }
 }

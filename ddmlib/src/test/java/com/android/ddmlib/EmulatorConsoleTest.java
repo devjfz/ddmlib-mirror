@@ -17,29 +17,21 @@ package com.android.ddmlib;
 
 import junit.framework.TestCase;
 
-/**
- * Unit tests for {@link EmulatorConsole}.
- */
+/** Unit tests for {@link EmulatorConsole}. */
 public class EmulatorConsoleTest extends TestCase {
 
-    /**
-     * Test success case for {@link EmulatorConsole#getEmulatorPort(String)}.
-     */
-    public void testGetEmulatorPort() {
-        assertEquals(Integer.valueOf(5554), EmulatorConsole.getEmulatorPort("emulator-5554"));
-    }
+  /** Test success case for {@link EmulatorConsole#getEmulatorPort(String)}. */
+  public void testGetEmulatorPort() {
+    assertEquals(Integer.valueOf(5554), EmulatorConsole.getEmulatorPort("emulator-5554"));
+  }
 
-    /**
-     * Test {@link EmulatorConsole#getEmulatorPort(String)} when input serial has invalid format.
-     */
-    public void testGetEmulatorPort_invalid() {
-        assertNull(EmulatorConsole.getEmulatorPort("invalidserial"));
-    }
+  /** Test {@link EmulatorConsole#getEmulatorPort(String)} when input serial has invalid format. */
+  public void testGetEmulatorPort_invalid() {
+    assertNull(EmulatorConsole.getEmulatorPort("invalidserial"));
+  }
 
-    /**
-     * Test {@link EmulatorConsole#getEmulatorPort(String)} when port is not a number.
-     */
-    public void testGetEmulatorPort_nan() {
-        assertNull(EmulatorConsole.getEmulatorPort("emulator-NaN"));
-    }
+  /** Test {@link EmulatorConsole#getEmulatorPort(String)} when port is not a number. */
+  public void testGetEmulatorPort_nan() {
+    assertNull(EmulatorConsole.getEmulatorPort("emulator-NaN"));
+  }
 }

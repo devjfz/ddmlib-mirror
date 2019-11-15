@@ -16,14 +16,9 @@
 
 package com.android.ddmlib;
 
-/**
- * Classes which implement this interface provide a method that returns a stack trace.
- */
+/** Classes which implement this interface provide a method that returns a stack trace. */
 public interface IStackTraceInfo {
 
-    /**
-     * Returns the stack trace. This can be <code>null</code>.
-     */
-    public StackTraceElement[] getStackTrace();
-
+  /** Returns the stack trace. This can be <code>null</code>. */
+  public StackTraceElement[] getStackTrace();
 }
