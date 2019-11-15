@@ -1,0 +1,3 @@
+include ':ddmlib', ':common', ':sample'
+
+rootProject.name = 'ddmlib'

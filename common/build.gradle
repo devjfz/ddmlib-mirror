@@ -1,0 +1,9 @@
+apply plugin: "java-library"
+
+dependencies {
+  implementation "com.google.guava:guava:13.0.1"
+
+  testImplementation "junit:junit:3.8.1"
+}
+
+apply from: "../spotless.gradle"
